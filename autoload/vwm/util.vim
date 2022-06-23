@@ -11,6 +11,7 @@
 " node_type = { 0: 'root', 1: 'left', 2: 'right', 3: 'top', 4: 'bot', 5: 'float }
 " Cache is an empty dictionary for saving special info through recursion
 fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
+    let l:o_wid = win_getid()
 
     if !(a:bfr is v:null)
         if has_key(a:target, 'wid') && a:target.wid != -1 && a:target.wid != win_getid()
@@ -19,8 +20,10 @@ fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
         call s:execute(a:bfr, a:target, a:node_type, a:cache)
     endif
 
-    "let l:wid = win_getid()
-    let l:bnr = bufnr('%')
+    if !exists('a:cache.new')
+        let l:wid = win_getid()
+        "let l:bnr = bufnr('%')
+    endif
 
     " Save the buffer id at each level
     if a:vert
@@ -28,13 +31,13 @@ fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
             call vwm#util#traverse(a:target.left, a:bfr, a:aftr, v:true, v:true, v:true, 1, a:cache)
 
             "call win_gotoid(l:wid)
-            execute(bufwinnr(l:bnr) . 'wincmd w')
+            "execute(bufwinnr(l:bnr) . 'wincmd w')
         endif
         if has_key(a:target, 'right')
             call vwm#util#traverse(a:target.right, a:bfr, a:aftr, v:true, v:true, v:true, 2, a:cache)
 
             "call win_gotoid(l:wid)
-            execute(bufwinnr(l:bnr) . 'wincmd w')
+            "execute(bufwinnr(l:bnr) . 'wincmd w')
         endif
     endif
 
@@ -43,29 +46,32 @@ fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
             call vwm#util#traverse(a:target.top, a:bfr, a:aftr, v:true, v:true, v:true, 3, a:cache)
 
             "call win_gotoid(l:wid)
-            execute(bufwinnr(l:bnr) . 'wincmd w')
+            "execute(bufwinnr(l:bnr) . 'wincmd w')
         endif
         if has_key(a:target, 'bot')
             call vwm#util#traverse(a:target.bot, a:bfr, a:aftr, v:true, v:true, v:true, 4, a:cache)
 
             "call win_gotoid(l:wid)
-            execute(bufwinnr(l:bnr) . 'wincmd w')
+            "execute(bufwinnr(l:bnr) . 'wincmd w')
         endif
     endif
 
-    "if a:float
-    "    if has_key(a:target, 'float')
-    "        call vwm#util#traverse(a:target.float, a:bfr, a:aftr, v:true, v:true, v:true, 5, a:cache)
-    "    endif
-    "endif
+    if a:float
+        if has_key(a:target, 'float')
+            call vwm#util#traverse(a:target.float, a:bfr, a:aftr, v:true, v:true, v:true, 5, a:cache)
+        endif
+    endif
 
     if !(a:aftr is v:null)
-        call s:execute(a:aftr, a:target, a:node_type, a:cache)
+        if !exists('a:cache.new')
+            call win_gotoid(l:wid)
+            "execute(bufwinnr(l:bnr) . 'wincmd w')
+        endif
 
-        "call win_gotoid(l:wid)
-        execute(bufwinnr(l:bnr) . 'wincmd w')
+        call s:execute(a:aftr, a:target, a:node_type, a:cache)
     endif
-    "call win_gotoid(l:wid)
+
+    call win_gotoid(l:o_wid)
 endfun
 
 

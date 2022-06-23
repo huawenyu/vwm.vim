@@ -68,12 +68,11 @@ fun! vwm#update(...)
         return
     endif
 
-    let l:cache = {}
     for l:t in a:000
         if type(l:t) == 1 && has_key(g:vwm#layouts, l:t)
             let l:target = vwm#util#lookup(l:t)
             call vwm#util#traverse(l:target, function('s:update_helper')
-                        \, v:null, v:true, v:true, v:false, 0, l:cache)
+                        \, v:null, v:true, v:true, v:false, 0, {})
         endif
     endfor
 endfun
@@ -117,7 +116,7 @@ endfun
 fun! s:open(...)
   let __func__ = "s:open() "
 
-  let l:cache = {}
+  let l:cache = {'new': 1}
   if g:vwm#pop_order == 'both'
     for l:t in a:000
 
