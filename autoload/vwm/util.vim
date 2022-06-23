@@ -12,85 +12,81 @@
 " Cache is an empty dictionary for saving special info through recursion
 fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
 
-  if !(a:bfr is v:null)
-    call s:execute(a:bfr, a:target, a:node_type, a:cache)
-  endif
-
-  let l:bnr = bufnr('%')
-
-  " Save the buffer id at each level
-  if a:vert
-
-    if util#node_has_child(a:target, 'left')
-      call vwm#util#traverse(a:target.left, a:bfr, a:aftr, v:true, v:true, v:true, 1, a:cache)
-      execute(bufwinnr(l:bnr) . 'wincmd w')
-    endif
-    if util#node_has_child(a:target, 'right')
-      call vwm#util#traverse(a:target.right, a:bfr, a:aftr, v:true, v:true, v:true, 2, a:cache)
-      execute(bufwinnr(l:bnr) . 'wincmd w')
+    if !(a:bfr is v:null)
+        if has_key(a:target, 'wid') && a:target.wid != -1 && a:target.wid != win_getid()
+            call win_gotoid(a:target.wid)
+        endif
+        call s:execute(a:bfr, a:target, a:node_type, a:cache)
     endif
 
-  endif
+    "let l:wid = win_getid()
+    let l:bnr = bufnr('%')
 
-  if a:horz
+    " Save the buffer id at each level
+    if a:vert
+        if has_key(a:target, 'left')
+            call vwm#util#traverse(a:target.left, a:bfr, a:aftr, v:true, v:true, v:true, 1, a:cache)
 
-    if util#node_has_child(a:target, 'top')
-      call vwm#util#traverse(a:target.top, a:bfr, a:aftr, v:true, v:true, v:true, 3, a:cache)
-      execute(bufwinnr(l:bnr) . 'wincmd w')
-    endif
-    if util#node_has_child(a:target, 'bot')
-      call vwm#util#traverse(a:target.bot, a:bfr, a:aftr, v:true, v:true, v:true, 4, a:cache)
-      execute(bufwinnr(l:bnr) . 'wincmd w')
-    endif
+            "call win_gotoid(l:wid)
+            execute(bufwinnr(l:bnr) . 'wincmd w')
+        endif
+        if has_key(a:target, 'right')
+            call vwm#util#traverse(a:target.right, a:bfr, a:aftr, v:true, v:true, v:true, 2, a:cache)
 
-  endif
-
-  if a:float
-
-    if util#node_has_child(a:target, 'float')
-      call vwm#util#traverse(a:target.float, a:bfr, a:aftr, v:true, v:true, v:true, 5, a:cache)
+            "call win_gotoid(l:wid)
+            execute(bufwinnr(l:bnr) . 'wincmd w')
+        endif
     endif
 
-  endif
+    if a:horz
+        if has_key(a:target, 'top')
+            call vwm#util#traverse(a:target.top, a:bfr, a:aftr, v:true, v:true, v:true, 3, a:cache)
 
-  if !(a:aftr is v:null)
-    call s:execute(a:aftr, a:target, a:node_type, a:cache)
-    execute(bufwinnr(l:bnr) . 'wincmd w')
-  endif
+            "call win_gotoid(l:wid)
+            execute(bufwinnr(l:bnr) . 'wincmd w')
+        endif
+        if has_key(a:target, 'bot')
+            call vwm#util#traverse(a:target.bot, a:bfr, a:aftr, v:true, v:true, v:true, 4, a:cache)
 
+            "call win_gotoid(l:wid)
+            execute(bufwinnr(l:bnr) . 'wincmd w')
+        endif
+    endif
+
+    "if a:float
+    "    if has_key(a:target, 'float')
+    "        call vwm#util#traverse(a:target.float, a:bfr, a:aftr, v:true, v:true, v:true, 5, a:cache)
+    "    endif
+    "endif
+
+    if !(a:aftr is v:null)
+        call s:execute(a:aftr, a:target, a:node_type, a:cache)
+
+        "call win_gotoid(l:wid)
+        execute(bufwinnr(l:bnr) . 'wincmd w')
+    endif
+    "call win_gotoid(l:wid)
 endfun
 
-
-fun! util#node_has_child(node, pos)
-  if eval("exists('a:node." . a:pos . "')")
-    return eval('len(a:node.' . a:pos . ')') ? 1 : 0
-  endif
-  return 0
-endfun
 
 "-----------------------------------------------Misc------------------------------------------------
 
 " If a funcref is given, execute the function. Else assume list of strings
 " Arity arg represents a list of arguments to be passed to the funcref
 fun! s:execute(target, ...)
-  if type(a:target) == 2
-    let l:Vwm_Target = s:apply_funcref(a:target, a:000)
-    call l:Vwm_Target()
-
-  else
-
-    for l:Cmd in a:target
-
-      if type(l:Cmd) == 2
-        let l:Vwm_Target = s:apply_funcref(l:Cmd, a:000)
+    if type(a:target) == 2
+        let l:Vwm_Target = s:apply_funcref(a:target, a:000)
         call l:Vwm_Target()
-      else
-        execute(l:Cmd)
-      endif
-
-    endfor
-
-  endif
+    else
+        for l:Cmd in a:target
+            if type(l:Cmd) == 2
+                let l:Vwm_Target = s:apply_funcref(l:Cmd, a:000)
+                call l:Vwm_Target()
+            else
+                execute(l:Cmd)
+            endif
+        endfor
+    endif
 endfun
 
 fun! s:apply_funcref(f, args)

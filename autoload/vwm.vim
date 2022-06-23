@@ -15,7 +15,8 @@ fun! s:import(...)
 endfun
 
 fun! vwm#init()
-  call s:import('execute', 'get', 'buf_active', 'wipe_aux_bufs', 'get_active_bufs')
+    silent! let s:log = logger#getLogger(expand('<sfile>:t'))
+    call s:import('execute', 'get', 'buf_active', 'wipe_aux_bufs', 'get_active_bufs')
 endfun
 
 "------------------------------------------Command backers------------------------------------------
@@ -38,17 +39,26 @@ fun! vwm#toggle(...)
 endfun
 
 fun! vwm#resize(...)
-  for l:target in a:000
-    call s:resize(l:target)
-  endfor
+    if a:000 == [v:null] || len(a:000) == 0
+        return
+    endif
+
+    for l:t in a:000
+        if type(l:t) == 1 && has_key(g:vwm#layouts, l:t)
+            call s:resize(l:t)
+        endif
+    endfor
 endfun
 
 
 fun! s:update_helper(node, type, cache)
+    let __func__ = "s:update_helper() "
+
     if a:type >= 1 && a:type <= 4
-        if s:buf_active(a:node.bid) && len(a:node.update) > 0
-            execute(bufwinnr(a:node.bid) . 'wincmd w')
+        if exists('a:node.wid') && a:node.wid != -1 && len(a:node.update) > 0
+            call win_gotoid(a:node.wid)
             call s:execute(s:get(a:node.update))
+            silent! call s:log.info(__func__, "update '", a:node.name, "' wid=", a:node.wid)
         endif
     endif
 endfun
@@ -102,8 +112,10 @@ fun! s:close_helper(node, type, cache)
 
 endfun
 
+
 " Opens layout node by name or by dictionary def. DIRECTLY MUTATES DICT
 fun! s:open(...)
+  let __func__ = "s:open() "
 
   let l:cache = {}
   if g:vwm#pop_order == 'both'
@@ -140,72 +152,84 @@ fun! s:open(...)
 
   endif
 
-  if exists('l:cache.focus')
-    execute(bufwinnr(l:cache.focus) . 'wincmd w')
+  "if exists('l:cache.focus')
+  "  execute(bufwinnr(l:cache.focus) . 'wincmd w')
+  "  silent! call s:log.info(__func__, "focus-wid=", l:cache.focus_wid, " cur-wid=", win_getid())
+  "endif
+  if has_key(l:cache, 'focus_wid')
+    call win_gotoid(l:cache.focus_wid)
+    silent! call s:log.info(__func__, "focus-wid=", l:cache.focus_wid, " cur-wid=", win_getid())
   endif
 
 endfun
 
+
 fun! s:open_helper_bfr(node, type, cache)
-  if a:type == 0
-    let a:cache.set_all = a:node.set_all
-  " Create new windows as needed. Float is a special case that cannot be handled here.
+    let __func__ = "s:open_helper_bfr() "
 
-  elseif a:type >= 1 && a:type <= 4
+    if a:type == 0
+        let a:cache.set_all = a:node.set_all
+        " Create new windows as needed. Float is a special case that cannot be handled here.
+    elseif a:type >= 1 && a:type <= 4
+        " If abs use absolute positioning else use relative
+        if a:node.abs
+            call s:new_abs_win(a:type)
+        else
+            call s:new_std_win(a:type)
+        endif
+        let a:node.wid = win_getid()
 
-    " If abs use absolute positioning else use relative
-    if a:node.abs
-      call s:new_abs_win(a:type)
-    else
-      call s:new_std_win(a:type)
+        " Whatever the last occurrence of focus is will be focused
+        if s:get(a:node.focus)
+            let a:cache.focus_wid = a:node.wid
+            silent! call s:log.info(__func__, "create-focus '", a:node.name, "' wid=", a:node.wid)
+        else
+            silent! call s:log.info(__func__, "create '", a:node.name, "' wid=", a:node.wid)
+        endif
+
+        " Make window proper size
+        call s:mk_tmp()
+        call s:resize_node(a:node, a:type)
     endif
-
-    " Make window proper size
-    call s:mk_tmp()
-    call s:resize_node(a:node, a:type)
-
-  endif
-
 endfun
 
 " Force the result of commands to go in to the desired window
 fun! s:open_helper_aftr(node, type, cache)
-  let l:init_buf = bufnr('%')
+    let l:init_buf = bufnr('%')
 
-  " If buf exists, place it in current window and kill tmp buff
-  if bufexists(a:node.bid)
-    call s:restore_content(a:node, a:type)
-  " Otherwise capture the buffer and move it to the current window
-  else
-    execute(bufwinnr(l:init_buf) . 'wincmd w')
-    let a:node.bid = s:capture_buf(a:node, a:type)
+    " If buf exists, place it in current window and kill tmp buff
+    if bufexists(a:node.bid)
+        call s:restore_content(a:node, a:type)
+        " Otherwise capture the buffer and move it to the current window
+    else
+        execute(bufwinnr(l:init_buf) . 'wincmd w')
+        let a:node.bid = s:capture_buf(a:node, a:type)
 
-    if !s:buf_active(a:node.bid)
-      call s:place_buf(a:node, a:type)
+        if !s:buf_active(a:node.bid)
+            call s:place_buf(a:node, a:type)
+        endif
     endif
 
-  endif
 
+    " apply node.set as setlocal
+    if !empty(a:node.set)
+        call s:set_buf(a:node.set)
+    endif
 
-  " apply node.set as setlocal
-  if !empty(a:node.set)
-    call s:set_buf(a:node.set)
-  endif
+    if !empty(a:cache.set_all)
+        call s:set_buf(a:cache.set_all)
+    endif
 
-  if !empty(a:cache.set_all)
-    call s:set_buf(a:cache.set_all)
-  endif
+    " Whatever the last occurrence of focus is will be focused
+    "if s:get(a:node.focus)
+    "    let a:cache.focus = a:node.bid
+    "endif
 
-  " Whatever the last occurrence of focus is will be focused
-  if s:get(a:node.focus)
-    let a:cache.focus = a:node.bid
-  endif
+    if a:type == 0 && g:vwm#eager_render
+        redraw
+    endif
 
-  if a:type == 0 && g:vwm#eager_render
-    redraw
-  endif
-
-  return bufnr('%')
+    return bufnr('%')
 endfun
 
 fun! s:toggle(...)
@@ -366,14 +390,21 @@ endfun
 
 " Resize some or all nodes.
 fun! s:resize_node(node, type)
+    let __func__ = "s:resize_node() "
 
-  if s:get(a:node.v_sz)
-    execute('vert resize ' . s:get(a:node.v_sz))
-  endif
-  if s:get(a:node.h_sz)
-    execute('resize ' . s:get(a:node.h_sz))
-  endif
+    if exists('a:node.wid') && a:node.wid != -1 && a:node.wid != win_getid()
+        call win_gotoid(a:node.wid)
+        silent! call s:log.info(__func__, " re-focus wid=", win_getid())
+    endif
 
+    if s:get(a:node.v_sz)
+        execute('vert resize ' . s:get(a:node.v_sz))
+        silent! call s:log.info(__func__, 'vert-resize=', s:get(a:node.v_sz), " wid=", win_getid())
+    endif
+    if s:get(a:node.h_sz)
+        execute('resize ' . s:get(a:node.h_sz))
+        silent! call s:log.info(__func__, 'resize=', s:get(a:node.h_sz), " wid=", win_getid())
+    endif
 endfun
 
 " Resize as the driving traverse and do

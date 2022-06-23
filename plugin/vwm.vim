@@ -1,4 +1,8 @@
 " VWM main user interface
+if exists('g:vwm#active')
+    finish
+endif
+silent! let s:log = logger#getLogger(expand('<sfile>:t'))
 
 "-------------------------------------------Init globals-------------------------------------------
 if !exists('g:vwm#pop_order')
@@ -34,7 +38,7 @@ endif
 fun! s:normalize_root(node)
 
   if !exists('a:node.name')
-    let a:node['name'] = ''
+    let a:node['name'] = 'root'
   endif
   if !exists('a:node.opnBfr')
     let a:node['opnBfr'] = []
@@ -53,6 +57,9 @@ fun! s:normalize_root(node)
   endif
   if !exists('a:node.bid')
     let a:node['bid'] = -1
+  endif
+  if !exists('a:node.wid')
+    let a:node['wid'] = -1
   endif
   if !exists('a:node.focus')
     let a:node['focus'] = 0
@@ -73,22 +80,25 @@ fun! s:normalize_root(node)
     let a:node['set_all'] = []
   endif
   "TODO: Cache is the same as setlocal bh=wipe, make that clear.
-  if util#node_has_child(a:node, 'left')
+  if has_key(a:node, 'left')
     call s:inject_abs(a:node.left)
   endif
-  if util#node_has_child(a:node, 'right')
+  if has_key(a:node, 'right')
     call s:inject_abs(a:node.right)
   endif
-  if util#node_has_child(a:node, 'top')
+  if has_key(a:node, 'top')
     call s:inject_abs(a:node.top)
   endif
-  if util#node_has_child(a:node, 'bot')
+  if has_key(a:node, 'bot')
     call s:inject_abs(a:node.bot)
   endif
 
 endfun
 
 fun! s:normalize_child(node)
+  if !exists('a:node.name')
+    let a:node['name'] = "child"
+  endif
   if !exists('a:node.v_sz')
     let a:node['v_sz'] = 0
   endif
@@ -97,6 +107,9 @@ fun! s:normalize_child(node)
   endif
   if !exists('a:node.bid')
     let a:node['bid'] = -1
+  endif
+  if !exists('a:node.wid')
+    let a:node['wid'] = -1
   endif
   if !exists('a:node.init')
     let a:node['init'] = []
@@ -120,7 +133,9 @@ fun! s:normalize_child(node)
 endfun
 
 fun! s:normalize_float(node)
-
+  if !exists('a:node.name')
+    let a:node['name'] = "float"
+  endif
   if !exists('a:node.x')
     echoerr "Missing key x"
   endif
@@ -138,6 +153,9 @@ fun! s:normalize_float(node)
   endif
   if !exists('a:node.bid')
     let a:node['bid'] = -1
+  endif
+  if !exists('a:node.wid')
+    let a:node['wid'] = -1
   endif
   if !exists('a:node.init')
     let a:node['init'] = []
