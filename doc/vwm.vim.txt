@@ -23,6 +23,9 @@ COMMANDS                                                    *vwm-commands*
   Repopulates all layouts. Can be used to reformat all open layouts back to
   their original state.
 
+:VwmUpdate
+  Traversals windows of current layout, execute the update-cmds.
+
 :VwmReinit
   After manual changes to g:vwm#layouts, call to re-normalize the dictionary.
 
@@ -70,7 +73,7 @@ g:vwm#pop_order                                              *g:vwm#pop_order*
     |_____|______|_____|
 
 g:vwm#layouts                                                  *g:vwm#layouts*
-  A list containing layouts accessible to this plugin. See |vwm-layouts| and
+  A dictionary (name as key) containing layouts accessible to this plugin. See |vwm-layouts| and
   |vwm-layouts-example|.
   NOTE: Windows are created from layouts using a depth first traversal of
   the layout definition. The order of depths traversed is as follows:
@@ -81,7 +84,7 @@ g:vwm#layouts                                                  *g:vwm#layouts*
   Each layout consists of a root node and 1 or more child nodes, where each
   node is a dictionary. A root node contains the following attributes:
 
-  {name}: The name of a layout definition. Used in `:VwmOpen` and `:VwmClose`
+  key-{name}: The name of a layout definition. Used in `:VwmOpen` and `:VwmClose`
 
   {left}[opt]: Layouts originating from the left, relative or absolute.
 
@@ -195,6 +198,9 @@ vwm#resize(...)
   Resizes a root node(s) and all of its children to their defined size.
   To resize all nodes when closing a window try >
     au! BufDelete * call vwm#resize(vwm#util#active())
+
+vwm#update()
+  Traversals windows of current layout, and execute the commands.
 
 vwm#refresh()
   Toggles all active layouts twice.

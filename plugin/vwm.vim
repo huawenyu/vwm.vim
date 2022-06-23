@@ -10,21 +10,23 @@ if !exists('g:vwm#eager_render')
 endif
 
 let s:def_layt = {
-      \  'name': 'default',
-      \  'set_all': ['nonu', 'nornu'],
-      \  'bot':
-      \  {
-      \    'h_sz': 12,
-      \    'init': ['term bash'],
-      \    'left':
-      \    {
-      \      'init': ['term bash']
-      \    }
+      \  'default': {
+      \      'name': 'default',
+      \      'set_all': ['nonu', 'nornu'],
+      \      'bot': {
+      \          'h_sz': 12,
+      \          'init': ['term bash'],
+      \          'left': {
+      \              'init': ['term bash']
+      \          }
+      \      }
       \  }
       \}
 
-if !exists('g:vwm#layouts')
-  let g:vwm#layouts = [s:def_layt]
+if exists('g:vwm#layouts')
+    let g:vwm#layouts = hw#misc#merge(g:vwm#layouts, s:def_layt)
+else
+    let g:vwm#layouts = s:def_layt
 endif
 
 "------------------------------------Normalize node attribrutes-------------------------------------
@@ -57,6 +59,9 @@ fun! s:normalize_root(node)
   endif
   if !exists('a:node.init')
     let a:node['init'] = []
+  endif
+  if !exists('a:node.update')
+    let a:node['update'] = []
   endif
   if !exists('a:node.restore')
     let a:node['restore'] = []
@@ -96,6 +101,9 @@ fun! s:normalize_child(node)
   if !exists('a:node.init')
     let a:node['init'] = []
   endif
+  if !exists('a:node.update')
+    let a:node['update'] = []
+  endif
   if !exists('a:node.restore')
     let a:node['restore'] = []
   endif
@@ -134,6 +142,9 @@ fun! s:normalize_float(node)
   if !exists('a:node.init')
     let a:node['init'] = []
   endif
+  if !exists('a:node.update')
+    let a:node['update'] = []
+  endif
   if !exists('a:node.restore')
     let a:node['restore'] = []
   endif
@@ -169,14 +180,14 @@ fun! s:normalize_helper(node, type, cache)
   endif
 endfun
 
+
 fun! s:normalize()
-
-  for l:node in g:vwm#layouts
-    call vwm#util#traverse(l:node, function('s:normalize_helper'), v:null
-          \, v:true, v:true, v:true, 0, {})
-  endfor
-
+    for [next_key, next_node] in items(g:vwm#layouts)
+        call vwm#util#traverse(next_node, function('s:normalize_helper'), v:null
+                    \, v:true, v:true, v:true, 0, {})
+    endfor
 endfun
+
 
 " Initialize vwm.vim
 call s:normalize()
@@ -190,3 +201,6 @@ command! -nargs=+ VwmClose call vwm#close(<f-args>)
 command! -nargs=+ VwmToggle call vwm#toggle(<f-args>)
 command! -nargs=0 VwmCloseAll call call('vwm#close', vwm#util#active())
 command! -nargs=0 VwmRefresh call vwm#refresh()
+command! -nargs=+ VwmResize call vwm#resize(<f-args>)
+command! -nargs=+ VwmUpdate call vwm#update(<f-args>)
+

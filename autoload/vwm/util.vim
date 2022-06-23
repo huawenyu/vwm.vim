@@ -111,19 +111,19 @@ fun! s:get(Target)
   endif
 endfun
 
-" Returns the first node in g:vwm#layouts with a matching name
-fun! vwm#util#lookup(name)
-  for l:node in g:vwm#layouts
 
-    if a:name == l:node.name
-      return l:node
+" Returns the node in g:vwm#layouts with a given name
+fun! vwm#util#lookup(name)
+    let __func__ = 'vwm#util#lookup() '
+
+    if ! has_key(g:vwm#layouts, a:name)
+        echoerr __func__..a:name.." not in dictionary"
+        return -1
     endif
 
-  endfor
-
-  echoerr a:name . " not in dictionary"
-  return -1
+    return get(g:vwm#layouts, a:name)
 endfun
+
 
 " Returns true if the buffer exists in a currently visable window
 fun! s:buf_active(bid)
@@ -132,35 +132,31 @@ endfun
 
 " Retruns a list of all active layouts
 fun! vwm#util#active()
-  let l:active = []
-  for node in g:vwm#layouts
+    let l:active = []
 
-    if node.active
-      let l:active += [node]
-    endif
-
-  endfor
-  return l:active
+    for [next_key, next_node] in items(g:vwm#layouts)
+        if next_node.active
+            let l:active += [next_node]
+        endif
+    endfor
+    return l:active
 endfun
 
 " ... = ignore
 fun! s:wipe_aux_bufs(ls_init, ...)
-  for l:bid in s:get_active_bufs()
-if index(a:ls_init, l:bid) < 0 && index(a:000, l:bid) < 0
-      execute(l:bid . 'bw')
-    endif
-
-  endfor
+    for l:bid in s:get_active_bufs()
+        if index(a:ls_init, l:bid) < 0 && index(a:000, l:bid) < 0
+            execute(l:bid . 'bw')
+        endif
+    endfor
 endfun
 
 fun! s:get_active_bufs()
   let l:ret = []
   for l:bid in range(1, bufnr('$'))
-
-    if bufexists(l:bid)
-      let l:ret += [l:bid]
-    endif
-
+      if bufexists(l:bid)
+          let l:ret += [l:bid]
+      endif
   endfor
 
   return l:ret

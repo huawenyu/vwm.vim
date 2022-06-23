@@ -43,6 +43,32 @@ fun! vwm#resize(...)
   endfor
 endfun
 
+
+fun! s:update_helper(node, type, cache)
+    if a:type >= 1 && a:type <= 4
+        if s:buf_active(a:node.bid) && len(a:node.update) > 0
+            execute(bufwinnr(a:node.bid) . 'wincmd w')
+            call s:execute(s:get(a:node.update))
+        endif
+    endif
+endfun
+
+fun! vwm#update(...)
+    if a:000 == [v:null] || len(a:000) == 0
+        return
+    endif
+
+    let l:cache = {}
+    for l:t in a:000
+        if type(l:t) == 1 && has_key(g:vwm#layouts, l:t)
+            let l:target = vwm#util#lookup(l:t)
+            call vwm#util#traverse(l:target, function('s:update_helper')
+                        \, v:null, v:true, v:true, v:false, 0, l:cache)
+        endif
+    endfor
+endfun
+
+
 fun! vwm#refresh()
   let l:active = vwm#util#active()
 
@@ -210,7 +236,8 @@ endfun
 " Resize a root node and all of its children
 fun! s:resize(target)
   let l:target = type(a:target) == 1 ? vwm#util#lookup(a:target) : a:target
-  call vwm#util#traverse(l:target, function('s:resize_helper'), v:null, v:true, v:true, 0, {})
+  call vwm#util#traverse(l:target, function('s:resize_helper'), v:null
+              \, v:true, v:true, v:true, 0, {})
 endfun
 
 "---------------------------------------------Auxiliary---------------------------------------------
