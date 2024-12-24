@@ -27,9 +27,7 @@ let s:def_layt = {
       \  }
       \}
 
-if exists('g:vwm#layouts')
-    let g:vwm#layouts = hw#misc#merge(g:vwm#layouts, s:def_layt)
-else
+if !exists('g:vwm#layouts')
     let g:vwm#layouts = s:def_layt
 endif
 
@@ -201,8 +199,9 @@ endfun
 
 fun! s:normalize()
     for [next_key, next_node] in items(g:vwm#layouts)
+        let iterCtx = {'depth': 0}
         call vwm#util#traverse(next_node, function('s:normalize_helper'), v:null
-                    \, v:true, v:true, v:true, 0, {})
+                    \, v:true, v:true, v:true, 0, iterCtx)
     endfor
 endfun
 

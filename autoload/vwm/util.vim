@@ -11,13 +11,23 @@
 " node_type = { 0: 'root', 1: 'left', 2: 'right', 3: 'top', 4: 'bot', 5: 'float }
 " Cache is an empty dictionary for saving special info through recursion
 fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
-    let l:o_wid = win_getid()
+    let l:depth = a:cache.depth
+    let a:cache['depth'] = a:cache.depth + 1
+    if l:depth == 0
+        let l:o_wid = win_getid()
+    endif
 
     if !(a:bfr is v:null)
-        if has_key(a:target, 'wid') && a:target.wid != -1 && a:target.wid != win_getid()
-            call win_gotoid(a:target.wid)
-        endif
-        call s:execute(a:bfr, a:target, a:node_type, a:cache)
+        " once
+        for _ in range(1)
+            if exists('a:cache.update') && len(a:target.update) == 0
+                break
+            elseif !exists('a:cache.new') && exists('a:target.wid') && a:target.wid != -1 && a:target.wid != win_getid()
+                call win_gotoid(a:target.wid)
+            endif
+
+            call s:execute(a:bfr, a:target, a:node_type, a:cache)
+        endfor
     endif
 
     if !exists('a:cache.new')
@@ -71,7 +81,10 @@ fun! vwm#util#traverse(target, bfr, aftr, horz, vert, float, node_type, cache)
         call s:execute(a:aftr, a:target, a:node_type, a:cache)
     endif
 
-    call win_gotoid(l:o_wid)
+    if l:depth == 0
+        call win_gotoid(l:o_wid)
+        stopinsert
+    endif
 endfun
 
 

@@ -27,9 +27,9 @@ fun! vwm#close(...)
 endfun
 
 fun! vwm#open(...)
-  if a:000 != [v:null] && len(a:000)
-    call call('s:open', a:000)
-  endif
+    if a:000 != [v:null] && len(a:000)
+        call call('s:open', a:000)
+    endif
 endfun
 
 fun! vwm#toggle(...)
@@ -68,11 +68,12 @@ fun! vwm#update(...)
         return
     endif
 
+    let l:cache = {'depth': 0, 'update': 1}
     for l:t in a:000
         if type(l:t) == 1 && has_key(g:vwm#layouts, l:t)
             let l:target = vwm#util#lookup(l:t)
             call vwm#util#traverse(l:target, function('s:update_helper')
-                        \, v:null, v:true, v:true, v:false, 0, {})
+                        \, v:null, v:true, v:true, v:false, 0, l:cache)
         endif
     endfor
 endfun
@@ -90,11 +91,12 @@ endfun
 " TODO: Indictate the autocmd replacement available for safe_mode. QuitPre autocmd event
 fun! s:close(target)
   let l:target = type(a:target) == 1 ? vwm#util#lookup(a:target) : a:target
+
+  let iterCtx = {'depth': 0}
   call vwm#util#traverse(l:target, l:target.clsBfr, function('s:close_helper')
-        \, v:true, v:true, v:true, 0, {})
+        \, v:true, v:true, v:true, 0, iterCtx)
 
   let l:target.active = 0
-
   if exists('a:target.clsAftr') && !empty(a:target.clsAftr)
     call s:execute(s:get(a:target.clsAftr))
   endif
@@ -114,52 +116,54 @@ endfun
 
 " Opens layout node by name or by dictionary def. DIRECTLY MUTATES DICT
 fun! s:open(...)
-  let __func__ = "s:open() "
+    let __func__ = "s:open() "
 
-  let l:cache = {'new': 1}
-  if g:vwm#pop_order == 'both'
-    for l:t in a:000
+    let l:cache = {'depth': 0, 'new': 1}
+    if g:vwm#pop_order == 'both'
+        for l:t in a:000
+            let l:target = type(l:t) == 1 ? vwm#util#lookup(l:t) : l:t
+            let l:target.active = 1
 
-      let l:target = type(l:t) == 1 ? vwm#util#lookup(l:t) : l:t
-      let l:target.active = 1
+            call s:execute(s:get(l:target.opnBfr))
+            " If both populate layout in one traversal. Else do either vert or horizontal before the other
+            call vwm#util#traverse(l:target, function('s:open_helper_bfr'), function('s:open_helper_aftr')
+                        \, v:true, v:true, v:true, 0, l:cache)
+            call s:execute(s:get(l:target.opnAftr))
 
-      call s:execute(s:get(l:target.opnBfr))
-      " If both populate layout in one traversal. Else do either vert or horizontal before the other
-      call vwm#util#traverse(l:target, function('s:open_helper_bfr'), function('s:open_helper_aftr')
-            \, v:true, v:true, v:true, 0, l:cache)
-      call s:execute(s:get(l:target.opnAftr))
+            exec "VwmResize "..l:t
+        endfor
+    else
+        let l:vert = g:vwm#pop_order == 'vert'
 
-    endfor
+        for l:t in a:000
+            let l:target = type(l:t) == 1 ? vwm#util#lookup(l:t) : l:t
+            call s:execute(s:get(l:target.opnBfr))
+            call vwm#util#traverse(l:target, function('s:open_helper_bfr'), function('s:open_helper_aftr')
+                        \,!l:vert, l:vert, v:false, 0, l:cache)
+        endfor
 
-  else
-    let l:vert = g:vwm#pop_order == 'vert'
+        for l:t in a:000
+            let l:target = type(l:t) == 1 ? vwm#util#lookup(l:t) : l:t
+            let l:target.active = 1
+            call vwm#util#traverse(l:target, function('s:open_helper_bfr'), function('s:open_helper_aftr')
+                        \, l:vert, !l:vert, v:true, 0, l:cache)
+            call s:execute(s:get(l:target.opnAftr))
+        endfor
 
-    for l:t in a:000
-      let l:target = type(l:t) == 1 ? vwm#util#lookup(l:t) : l:t
-      call s:execute(s:get(l:target.opnBfr))
-      call vwm#util#traverse(l:target, function('s:open_helper_bfr'), function('s:open_helper_aftr')
-            \,!l:vert, l:vert, v:false, 0, l:cache)
-    endfor
+        for l:t in a:000
+            exec "VwmResize "..l:t
+        endfor
+    endif
 
-    for l:t in a:000
-      let l:target = type(l:t) == 1 ? vwm#util#lookup(l:t) : l:t
-      let l:target.active = 1
-      call vwm#util#traverse(l:target, function('s:open_helper_bfr'), function('s:open_helper_aftr')
-            \, l:vert, !l:vert, v:true, 0, l:cache)
-      call s:execute(s:get(l:target.opnAftr))
-    endfor
-
-  endif
-
-  "if exists('l:cache.focus')
-  "  execute(bufwinnr(l:cache.focus) . 'wincmd w')
-  "  silent! call s:log.info(__func__, "focus-wid=", l:cache.focus_wid, " cur-wid=", win_getid())
-  "endif
-  if has_key(l:cache, 'focus_wid')
-    call win_gotoid(l:cache.focus_wid)
-    silent! call s:log.info(__func__, "focus-wid=", l:cache.focus_wid, " cur-wid=", win_getid())
-  endif
-
+    " Maybe open two layout, but just handle the last focus
+    "if exists('l:cache.focus')
+    "  execute(bufwinnr(l:cache.focus) . 'wincmd w')
+    "  silent! call s:log.info(__func__, "focus-wid=", l:cache.focus_wid, " cur-wid=", win_getid())
+    "endif
+    if has_key(l:cache, 'focus_wid')
+        call win_gotoid(l:cache.focus_wid)
+        silent! call s:log.info(__func__, "focus-wid=", l:cache.focus_wid, " cur-wid=", win_getid())
+    endif
 endfun
 
 
@@ -186,9 +190,11 @@ fun! s:open_helper_bfr(node, type, cache)
             silent! call s:log.info(__func__, "create '", a:node.name, "' wid=", a:node.wid)
         endif
 
-        " Make window proper size
+        " Adjust window/buf option
         call s:mk_tmp()
-        call s:resize_node(a:node, a:type)
+        " Make window proper size
+        " Don't know why the resize has no use, so delay to the create-layout-done
+        "call s:resize_node(a:node, a:type)
     endif
 endfun
 
@@ -258,9 +264,11 @@ endfun
 
 " Resize a root node and all of its children
 fun! s:resize(target)
-  let l:target = type(a:target) == 1 ? vwm#util#lookup(a:target) : a:target
-  call vwm#util#traverse(l:target, function('s:resize_helper'), v:null
-              \, v:true, v:true, v:true, 0, {})
+    let l:target = type(a:target) == 1 ? vwm#util#lookup(a:target) : a:target
+
+    let iterCtx = {'depth': 0}
+    call vwm#util#traverse(l:target, function('s:resize_helper'), v:null
+                \, v:true, v:true, v:true, 0, iterCtx)
 endfun
 
 "---------------------------------------------Auxiliary---------------------------------------------
@@ -408,15 +416,12 @@ endfun
 
 " Resize as the driving traverse and do
 fun! s:resize_helper(node, type, cache)
-
-  if  a:type >= 1 && a:type <= 4
-
-    if s:buf_active(a:node.bid)
-      execute(bufwinnr(a:node.bid) . 'wincmd w')
-      call s:resize_node(a:node, a:type)
+    if  a:type >= 1 && a:type <= 4
+        "if s:buf_active(a:node.bid)
+            "execute(bufwinnr(a:node.bid) . 'wincmd w')
+            call s:resize_node(a:node, a:type)
+        "endif
     endif
-
-  endif
 endfun
 
 fun! s:get_tab_vars()
